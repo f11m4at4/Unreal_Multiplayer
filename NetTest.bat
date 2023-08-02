@@ -1,0 +1,1 @@
+"C:\Program Files\Epic Games\UE_5.2\Engine\Binaries\Win64\UnrealEditor.exe" "D:\Unreal\NetworkTest\NetworkTest.uproject" -game -ResX=640 -RexY=480 -WinX=200 -WinY=300 -log
