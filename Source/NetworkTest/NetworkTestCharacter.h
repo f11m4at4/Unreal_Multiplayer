@@ -57,10 +57,27 @@ protected:
 	// To add mapping context
 	virtual void BeginPlay();
 
+	virtual void Tick( float DeltaSeconds ) override;
+
 public:
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+private:
+	enum ENetRole myLocalRole;
+	enum ENetRole myRemoteRole;
+
+	UPROPERTY(Replicated)
+	float timeTest;
+	UPROPERTY(ReplicatedUsing=OnRep_JumpNotify)
+	int32 jumpCount = 0;
+	
+	UFUNCTION()
+	void OnRep_JumpNotify();
+
+	void OnJump();
+	void PrintLog();
 };
 

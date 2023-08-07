@@ -9,6 +9,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include <Net/UnrealNetwork.h>
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -16,23 +17,27 @@
 
 ANetworkTestCharacter::ANetworkTestCharacter()
 {
+	PrimaryActorTick.bCanEverTick = true;
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
+
+	GetCapsuleComponent()->SetCollisionObjectType(ECC_GameTraceChannel2);
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Overlap);
 		
 	// Don't rotate when the controller rotates. Let that just affect the camera.
 	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = false;
+	bUseControllerRotationYaw = true;
 	bUseControllerRotationRoll = false;
 
 	// Configure character movement
-	GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input...	
+	GetCharacterMovement()->bOrientRotationToMovement = false; // Character moves in the direction of input...	
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f); // ...at this rotation rate
 
 	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
 	// instead of recompiling to adjust them
 	GetCharacterMovement()->JumpZVelocity = 700.f;
 	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxWalkSpeed = 500.f;
+	GetCharacterMovement()->MaxWalkSpeed = 600.f;
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 
@@ -49,6 +54,8 @@ ANetworkTestCharacter::ANetworkTestCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+
+	bReplicates = true;
 }
 
 void ANetworkTestCharacter::BeginPlay()
@@ -64,6 +71,45 @@ void ANetworkTestCharacter::BeginPlay()
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
 	}
+
+	myLocalRole = GetLocalRole();
+	myRemoteRole = GetRemoteRole();
+}
+
+void ANetworkTestCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	PrintLog();
+
+	timeTest += DeltaSeconds;
+}
+
+void ANetworkTestCharacter::OnRep_JumpNotify()
+{
+	GEngine->AddOnScreenDebugMessage(-1, 3, FColor::Green, FString::Printf(TEXT("%s is jump %d times"), *GetName(), jumpCount));
+}
+
+void ANetworkTestCharacter::OnJump()
+{
+	Jump();
+	if (HasAuthority())
+	{
+		jumpCount++;
+	}
+}
+
+void ANetworkTestCharacter::PrintLog()
+{
+	/*const FString localRoleString = UEnum::GetValueAsString(GetLocalRole());
+	const FString remotelRoleString = UEnum::GetValueAsString(GetRemoteRole());
+	const FString ownerString = GetOwner() != nullptr ? GetOwner()->GetName() : FString("No Owner");
+	const FString connectionString = GetNetConnection() != nullptr ? FString("Valid Connection") : FString("Invalid Connection");
+	const FString printString = FString::Printf(TEXT("Local Role: %s\nRemote role: %s\nOwner: %s\nConnection: %s"), *localRoleString, *remotelRoleString, *ownerString, *connectionString);*/
+
+
+	const FString printString = FString::Printf(TEXT("Time: %.2f\nJump Count:%d"), timeTest, jumpCount);
+	DrawDebugString(GetWorld(), GetActorLocation(), printString, nullptr, FColor::White, 0, true);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -75,7 +121,7 @@ void ANetworkTestCharacter::SetupPlayerInputComponent(class UInputComponent* Pla
 	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
 		//Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ANetworkTestCharacter::OnJump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		//Moving
@@ -124,6 +170,13 @@ void ANetworkTestCharacter::Look(const FInputActionValue& Value)
 	}
 }
 
+void ANetworkTestCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
+	DOREPLIFETIME(ANetworkTestCharacter, timeTest);
+	DOREPLIFETIME(ANetworkTestCharacter, jumpCount);
+	//DOREPLIFETIME_CONDITION(ANetworkTestCharacter, timeTest, COND_OwnerOnly);
+}
 
 
